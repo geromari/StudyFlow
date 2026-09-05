@@ -6,7 +6,9 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from aiogram import BaseMiddleware
-from aiogram.types import CallbackQuery, Message, TelegramObject
+from aiogram.types import CallbackQuery, Message, TelegramObject, Update
+
+from app.bot.middlewares.user import extract_telegram_user
 
 logger = logging.getLogger("StudyFlowBot")
 
@@ -19,15 +21,15 @@ class LoggingMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         start_time = time.time()
-        user_id = None
-        action_name = "Unknown"
+        telegram_user = extract_telegram_user(event, data)
+        user_id = telegram_user.id if telegram_user else None
+        action_name = "Update"
 
-        if isinstance(event, Message):
-            user_id = event.from_user.id if event.from_user else None
-            action_name = f"Message: {event.text[:30] if event.text else event.content_type}"
-        elif isinstance(event, CallbackQuery):
-            user_id = event.from_user.id if event.from_user else None
-            action_name = f"Callback: {event.data}"
+        real_event = event.event if isinstance(event, Update) else event
+        if isinstance(real_event, Message):
+            action_name = f"Message: {real_event.text[:30] if real_event.text else real_event.content_type}"
+        elif isinstance(real_event, CallbackQuery):
+            action_name = f"Callback: {real_event.data}"
 
         try:
             result = await handler(event, data)

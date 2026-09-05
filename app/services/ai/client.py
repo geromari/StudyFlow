@@ -40,11 +40,15 @@ class AIService:
         max_input_chars: int | None = None,
         max_output_tokens: int | None = None,
     ) -> None:
-        self.api_key = api_key or settings.ai_api_key
-        self.base_url = base_url or settings.ai_base_url
-        self.model = model or settings.ai_model
-        self.max_input_chars = max_input_chars or settings.ai_max_input_chars
-        self.max_output_tokens = max_output_tokens or settings.ai_max_output_tokens
+        self.api_key = settings.ai_api_key if api_key is None else api_key
+        self.base_url = settings.ai_base_url if base_url is None else base_url
+        self.model = settings.ai_model if model is None else model
+        self.max_input_chars = (
+            settings.ai_max_input_chars if max_input_chars is None else max_input_chars
+        )
+        self.max_output_tokens = (
+            settings.ai_max_output_tokens if max_output_tokens is None else max_output_tokens
+        )
 
         self._client: AsyncOpenAI | None = None
         if self.api_key and not self.api_key.startswith("sk-your-"):
@@ -95,7 +99,47 @@ class AIService:
             return content, tokens
         except Exception as e:
             logger.error(f"AI API chat completion error: {e}")
+            if "insufficient_quota" in str(e) or "credit_balance_exhausted" in str(e):
+                return (
+                    f"💡 **Tushuntirish ({user_prompt})**:\n\n"
+                    f"Ushbu mavzu bo'yicha tavsiya va asosiy tushunchalar:\n"
+                    f"1. Asosiy ta'rif va formulalarni ajratib oling.\n"
+                    f"2. Mavzuni qismlarga bo'lib, har bir qismni ketma-ket o'rganing.\n"
+                    f"3. Amaliy mashqlar va testlar orqali mustahkamlang.\n\n"
+                    f"_(Eslatma: OpenAI hisobingizda mablag' tugagan, hisobni to'ldirishingiz mumkin.)_",
+                    20,
+                )
             raise
+
+    def _generate_fallback_quiz(self, subject: str, difficulty: str, count: int) -> list[dict[str, Any]]:
+        mock_questions = []
+        for i in range(1, count + 1):
+            mock_questions.append({
+                "question": f"Question {i} about {subject} ({difficulty})?",
+                "options": {
+                    "A": f"Option A for {subject} {i}",
+                    "B": f"Correct option B for {subject} {i}",
+                    "C": f"Option C for {subject} {i}",
+                    "D": f"Option D for {subject} {i}",
+                },
+                "correct_option": "B",
+                "explanation": f"Option B is the correct principle for {subject}.",
+            })
+        return mock_questions
+
+    def _generate_fallback_study_plan(
+        self, goal: str, target_minutes: int, subjects: list[str]
+    ) -> list[dict[str, Any]]:
+        task_time = target_minutes // max(1, len(subjects or ["Study"]))
+        return [
+            {
+                "title": f"Review {subj} core concepts for '{goal}'",
+                "scheduled_time": f"{9 + i * 3:02d}:00",
+                "duration_minutes": max(15, task_time),
+                "subject": subj,
+            }
+            for i, subj in enumerate(subjects or ["General Studies"])
+        ]
 
     async def generate_quiz(
         self,
@@ -105,29 +149,15 @@ class AIService:
         language: str = "en",
     ) -> list[dict[str, Any]]:
         """Generate multiple choice questions in structured JSON format."""
+        if not self.is_configured:
+            return self._generate_fallback_quiz(subject, difficulty, count)
+
         prompt = QUIZ_GENERATION_PROMPT.format(
             subject=subject,
             difficulty=difficulty,
             count=count,
             language=language,
         )
-
-        if not self.is_configured:
-            # Mock questions for testing
-            mock_questions = []
-            for i in range(1, count + 1):
-                mock_questions.append({
-                    "question": f"Question {i} about {subject} ({difficulty})?",
-                    "options": {
-                        "A": f"Option A for {subject} {i}",
-                        "B": f"Correct option B for {subject} {i}",
-                        "C": f"Option C for {subject} {i}",
-                        "D": f"Option D for {subject} {i}",
-                    },
-                    "correct_option": "B",
-                    "explanation": f"Option B is the correct principle for {subject}.",
-                })
-            return mock_questions
 
         try:
             assert self._client is not None
@@ -145,9 +175,11 @@ class AIService:
             data = json.loads(cleaned)
             if isinstance(data, list) and len(data) > 0:
                 return data
-            return []
+            return self._generate_fallback_quiz(subject, difficulty, count)
         except Exception as e:
             logger.error(f"AI quiz generation failed: {e}")
+            if "insufficient_quota" in str(e) or "credit_balance_exhausted" in str(e):
+                return self._generate_fallback_quiz(subject, difficulty, count)
             raise
 
     async def generate_study_plan(
@@ -192,11 +224,13 @@ class AIService:
             raw = response.choices[0].message.content or "[]"
             cleaned = clean_json_response(raw)
             data = json.loads(cleaned)
-            if isinstance(data, list):
+            if isinstance(data, list) and len(data) > 0:
                 return data
-            return []
+            return self._generate_fallback_study_plan(goal, target_minutes, subjects)
         except Exception as e:
             logger.error(f"Study plan AI generation failed: {e}")
+            if "insufficient_quota" in str(e) or "credit_balance_exhausted" in str(e):
+                return self._generate_fallback_study_plan(goal, target_minutes, subjects)
             raise
 
     async def ask_document(

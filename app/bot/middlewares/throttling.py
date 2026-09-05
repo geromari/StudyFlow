@@ -5,8 +5,9 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from aiogram import BaseMiddleware
-from aiogram.types import CallbackQuery, Message, TelegramObject
+from aiogram.types import CallbackQuery, Message, TelegramObject, Update
 
+from app.bot.middlewares.user import extract_telegram_user
 from app.utils.i18n import t
 from app.utils.rate_limiter import default_limiter
 
@@ -24,12 +25,7 @@ class ThrottlingMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        telegram_user = None
-        if isinstance(event, Message):
-            telegram_user = event.from_user
-        elif isinstance(event, CallbackQuery):
-            telegram_user = event.from_user
-
+        telegram_user = extract_telegram_user(event, data)
         if not telegram_user:
             return await handler(event, data)
 
@@ -39,10 +35,11 @@ class ThrottlingMiddleware(BaseMiddleware):
         if not allowed:
             lang = data.get("lang", "en")
             warning = t("rate_limit_exceeded", lang)
-            if isinstance(event, Message):
-                await event.answer(warning)
-            elif isinstance(event, CallbackQuery):
-                await event.answer(warning, show_alert=True)
+            real_event = event.event if isinstance(event, Update) else event
+            if isinstance(real_event, Message):
+                await real_event.answer(warning)
+            elif isinstance(real_event, CallbackQuery):
+                await real_event.answer(warning, show_alert=True)
             return
 
         return await handler(event, data)

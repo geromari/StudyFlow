@@ -32,6 +32,25 @@ class UserRepository(BaseRepository[User]):
         daily_target: int = 30,
         referrer_id: int | None = None,
     ) -> User:
+        user = await self.get_by_telegram_id(telegram_id)
+        if user:
+            user.first_name = first_name
+            if username:
+                user.username = username
+            if user.settings:
+                user.settings.language = language
+                user.settings.daily_study_target = daily_target
+            else:
+                settings = UserSettings(
+                    user_id=user.id,
+                    language=language,
+                    daily_study_target=daily_target,
+                )
+                self.session.add(settings)
+            await self.session.commit()
+            await self.session.refresh(user, attribute_names=["settings"])
+            return user
+
         user = User(
             telegram_id=telegram_id,
             first_name=first_name,

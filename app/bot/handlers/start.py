@@ -121,8 +121,11 @@ async def handle_registration_target(
     # 2. Add initial subject(s) based on user's interests input
     if interests_text and interests_text.strip():
         items = [s.strip() for s in interests_text.split(",") if s.strip()]
+        existing_subjects = await subject_repo.get_user_subjects(new_user.id)
+        existing_names = {s.name.strip().lower() for s in existing_subjects}
         for item in items[:4]:  # limit to first 4
-            await subject_repo.create_subject(new_user.id, item)
+            if item.strip().lower() not in existing_names:
+                await subject_repo.create_subject(new_user.id, item)
 
     # 3. Process referral if applicable
     if referrer_telegram_id:
