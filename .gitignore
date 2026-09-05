@@ -28,7 +28,13 @@ ENV/
 
 # Environment variables & secrets
 .env
+.env.*
+!.env.example
 *.env.local
+*.pem
+*.key
+*.cert
+secrets/
 
 # Database & storage
 *.sqlite3

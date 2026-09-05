@@ -8,11 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.bot.keyboards.inline import (
     get_confirm_delete_keyboard,
     get_subject_actions_keyboard,
+    get_subject_study_menu_keyboard,
     get_subjects_keyboard,
     get_topics_keyboard,
 )
 from app.bot.keyboards.reply import get_cancel_keyboard, get_main_menu_keyboard
-from app.bot.states.states import SubjectState
+from app.bot.states.states import AIAssistantState, SubjectState
 from app.database.models.subject import Topic
 from app.database.models.user import User
 from app.database.repositories.subject import SubjectRepository
@@ -29,7 +30,7 @@ async def handle_subjects_menu(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     if not user:
-        await message.answer("Please /start the bot first.")
+        await message.answer(t("please_start_first", lang))
         return
 
     subject_repo = SubjectRepository(session)
@@ -119,21 +120,75 @@ async def handle_view_subject(
     subject_repo = SubjectRepository(session)
     subject = await subject_repo.get_with_topics(subj_id)
     if not subject:
-        await callback.answer("Subject not found.")
+        await callback.answer(t("subject_not_found", lang))
         return
 
     topics_count = len(subject.topics)
-    completed_count = sum(1 for t in subject.topics if t.is_completed)
+    completed_count = sum(1 for t_item in subject.topics if t_item.is_completed)
 
-    text = (
-        f"{subject.color_icon} **{subject.name}**\n\n"
-        f"📊 Progress: {subject.progress_percent}%\n"
-        f"📑 Topics: {completed_count}/{topics_count} completed"
+    progress_info = t(
+        "subject_view_progress",
+        lang,
+        percent=subject.progress_percent,
+        completed=completed_count,
+        total=topics_count,
     )
+
+    text = f"{subject.color_icon} **{subject.name}**\n\n{progress_info}"
     await callback.message.edit_text(
         text,
         reply_markup=get_subject_actions_keyboard(subj_id, lang),
         parse_mode="Markdown",
+    )
+
+
+@router.callback_query(F.data.startswith("study_subj_"))
+async def handle_study_subject(
+    callback: CallbackQuery,
+    session: AsyncSession,
+    lang: str = DEFAULT_LANGUAGE,
+) -> None:
+    subj_id = int(callback.data.replace("study_subj_", ""))
+    subject_repo = SubjectRepository(session)
+    subject = await subject_repo.get_by_id(subj_id)
+    if not subject:
+        await callback.answer(t("subject_not_found", lang))
+        return
+
+    text = t("study_subject_title", lang, name=subject.name)
+    await callback.message.edit_text(
+        text,
+        reply_markup=get_subject_study_menu_keyboard(subj_id, lang),
+        parse_mode="Markdown",
+    )
+
+
+@router.callback_query(F.data.startswith("ai_subj_"))
+async def handle_ai_study_subject(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+    lang: str = DEFAULT_LANGUAGE,
+) -> None:
+    subj_id = int(callback.data.replace("ai_subj_", ""))
+    subject_repo = SubjectRepository(session)
+    subject = await subject_repo.get_by_id(subj_id)
+    if not subject:
+        await callback.answer(t("subject_not_found", lang))
+        return
+
+    await state.set_state(AIAssistantState.waiting_for_prompt)
+    await state.update_data(ai_mode="explain")
+    await callback.answer()
+    prompt_text = (
+        f"🤖 **{subject.name}** bo'yicha AI yordamchi faollashdi.\n\n"
+        f"Ushbu fan bo'yicha savolingizni yoki o'rganmoqchi bo'lgan mavzuni yozing:"
+        if lang == "uz"
+        else f"🤖 AI Assistant for **{subject.name}** is active.\n\nType your question or topic:"
+    )
+    await callback.message.answer(
+        prompt_text,
+        reply_markup=get_cancel_keyboard(lang),
     )
 
 
@@ -147,7 +202,7 @@ async def handle_confirm_delete_subject(
     subject_repo = SubjectRepository(session)
     subject = await subject_repo.get_by_id(subj_id)
     if not subject:
-        await callback.answer("Subject not found.")
+        await callback.answer(t("subject_not_found", lang))
         return
 
     await callback.message.edit_text(
@@ -211,7 +266,10 @@ async def handle_save_rename_subject(
     subject_repo = SubjectRepository(session)
     await subject_repo.rename_subject(subj_id, new_name)
     await state.clear()
-    await message.answer("✅ Subject renamed successfully!", reply_markup=get_main_menu_keyboard(lang))
+    await message.answer(
+        t("subject_created", lang, name=new_name),
+        reply_markup=get_main_menu_keyboard(lang),
+    )
 
 
 # Topics management
@@ -225,10 +283,12 @@ async def handle_view_topics(
     subject_repo = SubjectRepository(session)
     subject = await subject_repo.get_with_topics(subj_id)
     if not subject:
+        await callback.answer(t("subject_not_found", lang))
         return
 
+    text = t("topics_list_title", lang, name=subject.name)
     await callback.message.edit_text(
-        f"📑 Topics for **{subject.name}**:\nClick a topic to mark it complete.",
+        text,
         reply_markup=get_topics_keyboard(subj_id, subject.topics, lang),
         parse_mode="Markdown",
     )

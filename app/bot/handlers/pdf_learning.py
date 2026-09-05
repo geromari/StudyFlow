@@ -26,7 +26,7 @@ async def handle_pdf_menu(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     if not user:
-        await message.answer("Please /start the bot first.")
+        await message.answer(t("please_start_first", lang))
         return
 
     await state.set_state(PDFState.waiting_for_pdf)
@@ -57,7 +57,7 @@ async def handle_pdf_document_upload(
         await message.answer(f"⚠️ {err_msg}")
         return
 
-    processing_msg = await message.answer("⏳ Downloading and extracting document text...")
+    processing_msg = await message.answer(t("pdf_downloading", lang))
 
     try:
         # Download document into memory bytes
@@ -91,8 +91,12 @@ async def handle_pdf_document_upload(
             await processing_msg.delete()
         except Exception:
             pass
+        if "file is too big" in str(e).lower():
+            err_text = t("pdf_telegram_size_limit", lang)
+        else:
+            err_text = t("generic_error", lang)
         await message.answer(
-            f"❌ Error processing PDF: {e}",
+            err_text,
             reply_markup=get_main_menu_keyboard(lang),
         )
         await state.clear()
@@ -105,7 +109,7 @@ async def handle_pdf_summarize(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     doc_id = int(callback.data.replace("pdf_sum_", ""))
-    await callback.message.answer("📝 Generating comprehensive executive summary with AI...")
+    await callback.message.answer(t("ai_thinking", lang))
 
     pdf_service = PDFService(session)
     try:
@@ -128,7 +132,7 @@ async def handle_pdf_qa_prompt(
     await state.update_data(active_pdf_id=doc_id)
     await callback.answer()
     await callback.message.answer(
-        "❓ Ask any question about your uploaded document:",
+        t("ai_prompt_enter", lang),
         reply_markup=get_cancel_keyboard(lang),
     )
 
@@ -150,13 +154,14 @@ async def handle_pdf_answer_question(
         await state.clear()
         return
 
-    think_msg = await message.answer("🔍 Analyzing document for the answer...")
+    think_msg = await message.answer(t("ai_thinking", lang))
     pdf_service = PDFService(session)
 
     try:
         answer = await pdf_service.ask_question(doc_id, question, language=lang)
         await think_msg.delete()
-        await message.answer(f"📖 **Answer:**\n\n{answer}", parse_mode="Markdown")
+        ans_prefix = "📖 **Javob:**" if lang == "uz" else ("📖 **Ответ:**" if lang == "ru" else "📖 **Answer:**")
+        await message.answer(f"{ans_prefix}\n\n{answer}", parse_mode="Markdown")
     except Exception as e:
         logger.error(f"Error answering PDF question: {e}")
         try:
@@ -173,21 +178,23 @@ async def handle_pdf_quiz(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     doc_id = int(callback.data.replace("pdf_quiz_", ""))
-    await callback.message.answer("⚡ Generating practice quiz from your document with AI...")
+    await callback.message.answer(t("quiz_generating", lang))
 
     pdf_service = PDFService(session)
     try:
         questions = await pdf_service.generate_quiz_from_doc(doc_id, count=3, language=lang)
         if not questions:
-            await callback.message.answer("Could not generate quiz from document text.")
+            await callback.message.answer(t("generic_error", lang))
             return
 
-        text = "📝 **Practice Questions from your Document:**\n\n"
+        header = "📝 **Hujjat bo'yicha test savollari:**\n\n" if lang == "uz" else ("📝 **Вопросы по документу:**\n\n" if lang == "ru" else "📝 **Practice Questions from your Document:**\n\n")
+        text = header
         for i, q in enumerate(questions, 1):
             text += f"**{i}. {q.get('question')}**\n"
             for opt_k, opt_v in q.get("options", {}).items():
                 text += f"  {opt_k}) {opt_v}\n"
-            text += f"👉 *Correct: {q.get('correct_option')}*\n💡 _{q.get('explanation')}_\n\n"
+            corr_label = "To'g'ri javob" if lang == "uz" else ("Правильный ответ" if lang == "ru" else "Correct")
+            text += f"👉 *{corr_label}: {q.get('correct_option')}*\n💡 _{q.get('explanation')}_\n\n"
 
         await callback.message.answer(text, parse_mode="Markdown")
     except Exception as e:

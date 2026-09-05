@@ -23,8 +23,8 @@ async def test_mock_ai_service_chat() -> None:
         user_prompt="Explain recursion",
         mode="explain",
     )
-    assert "StudyFlow AI Response" in response
-    assert "recursion" in response
+    assert len(response) > 50
+    assert "recursion" in response.lower()
     assert tokens > 0
 
 

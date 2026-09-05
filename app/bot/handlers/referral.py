@@ -22,7 +22,7 @@ async def handle_referral_menu(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     if not user:
-        await message.answer("Please /start the bot first.")
+        await message.answer(t("please_start_first", lang))
         return
 
     bot_info = await bot.get_me()

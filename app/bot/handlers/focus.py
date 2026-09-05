@@ -26,7 +26,7 @@ async def handle_focus_menu(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     if not user:
-        await message.answer("Please /start the bot first.")
+        await message.answer(t("please_start_first", lang))
         return
 
     await message.answer(
@@ -41,12 +41,17 @@ async def handle_start_focus_session(
     state: FSMContext,
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
-    minutes = int(callback.data.replace("focus_start_", ""))
+    raw = callback.data.replace("focus_start_", "")
+    parts = raw.split("_")
+    minutes = int(parts[0])
+    subject_id = int(parts[1]) if len(parts) > 1 else None
+
     now_str = datetime.now(UTC).strftime("%H:%M")
 
     await state.set_state(FocusState.active_session)
     await state.update_data(
         focus_minutes=minutes,
+        focus_subject_id=subject_id,
         focus_start_timestamp=datetime.now(UTC).timestamp(),
     )
 
@@ -58,8 +63,11 @@ async def handle_start_focus_session(
 
 
 @router.callback_query(F.data == "focus_break_5")
-async def handle_focus_break(callback: CallbackQuery) -> None:
-    await callback.answer("☕ Take a deep breath and relax for 5 minutes!", show_alert=True)
+async def handle_focus_break(
+    callback: CallbackQuery,
+    lang: str = DEFAULT_LANGUAGE,
+) -> None:
+    await callback.answer(t("focus_break_alert", lang), show_alert=True)
 
 
 @router.callback_query(FocusState.active_session, F.data == "focus_finish_now")
@@ -75,20 +83,28 @@ async def handle_finish_focus_early(
 
     data = await state.get_data()
     minutes = data.get("focus_minutes", 25)
+    subject_id = data.get("focus_subject_id")
 
     focus_service = FocusService(session)
     _, xp_earned, unlocked = await focus_service.record_completed_session(
         user_id=user.id,
         duration_minutes=minutes,
+        subject_id=subject_id,
     )
     await state.clear()
 
     finish_text = t("focus_completed", lang, minutes=minutes, xp=xp_earned)
     for ach in unlocked:
-        finish_text += f"\n\n🏆 **Achievement Unlocked**: {ach.icon} {ach.title} (+{ach.xp_reward} XP)!"
+        finish_text += "\n\n" + t(
+            "achievement_unlocked_notification",
+            lang,
+            icon=ach.icon,
+            title=ach.title,
+            xp=ach.xp_reward,
+        )
 
     await callback.message.edit_text(finish_text, parse_mode="Markdown")
     await callback.message.answer(
-        "🎉 Great study session! Keep the momentum going!",
+        t("quiz_keep_it_up", lang),
         reply_markup=get_main_menu_keyboard(lang),
     )

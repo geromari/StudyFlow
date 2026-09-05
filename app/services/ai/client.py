@@ -16,6 +16,7 @@ from app.services.ai.prompt_templates import (
     STUDY_ASSISTANT_SYSTEM_PROMPT,
     STUDY_PLAN_GENERATION_PROMPT,
 )
+from app.services.ai.topic_explainer import explain_topic_comprehensively
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ class AIService:
         conversation_history: list[dict[str, str]],
         user_prompt: str,
         mode: str | None = None,
+        language: str = "uz",
     ) -> tuple[str, int]:
         """Send message to AI assistant with historical context and optional mode prefix."""
         prompt = self._truncate_input(user_prompt)
@@ -75,7 +77,7 @@ class AIService:
             prompt = MODE_PROMPTS[mode] + prompt
 
         messages: list[dict[str, str]] = [
-            {"role": "system", "content": STUDY_ASSISTANT_SYSTEM_PROMPT}
+            {"role": "system", "content": STUDY_ASSISTANT_SYSTEM_PROMPT + f"\nAlways respond in language: {language}."}
         ]
         # Include conversation context (already limited to latest messages)
         for msg in conversation_history:
@@ -83,8 +85,7 @@ class AIService:
         messages.append({"role": "user", "content": prompt})
 
         if not self.is_configured:
-            # Fallback mock for testing or unconfigured API
-            return f"[StudyFlow AI Response]: Regarding '{user_prompt}': This is a key academic concept. Remember to break it down into core principles and review regularly.", 50
+            return explain_topic_comprehensively(user_prompt, mode, language), 50
 
         try:
             assert self._client is not None
@@ -99,33 +100,7 @@ class AIService:
             return content, tokens
         except Exception as e:
             logger.error(f"AI API chat completion error: {e}")
-            if "insufficient_quota" in str(e) or "credit_balance_exhausted" in str(e):
-                return (
-                    f"💡 **Tushuntirish ({user_prompt})**:\n\n"
-                    f"Ushbu mavzu bo'yicha tavsiya va asosiy tushunchalar:\n"
-                    f"1. Asosiy ta'rif va formulalarni ajratib oling.\n"
-                    f"2. Mavzuni qismlarga bo'lib, har bir qismni ketma-ket o'rganing.\n"
-                    f"3. Amaliy mashqlar va testlar orqali mustahkamlang.\n\n"
-                    f"_(Eslatma: OpenAI hisobingizda mablag' tugagan, hisobni to'ldirishingiz mumkin.)_",
-                    20,
-                )
-            raise
-
-    def _generate_fallback_quiz(self, subject: str, difficulty: str, count: int) -> list[dict[str, Any]]:
-        mock_questions = []
-        for i in range(1, count + 1):
-            mock_questions.append({
-                "question": f"Question {i} about {subject} ({difficulty})?",
-                "options": {
-                    "A": f"Option A for {subject} {i}",
-                    "B": f"Correct option B for {subject} {i}",
-                    "C": f"Option C for {subject} {i}",
-                    "D": f"Option D for {subject} {i}",
-                },
-                "correct_option": "B",
-                "explanation": f"Option B is the correct principle for {subject}.",
-            })
-        return mock_questions
+            return explain_topic_comprehensively(user_prompt, mode, language), 50
 
     def _generate_fallback_study_plan(
         self, goal: str, target_minutes: int, subjects: list[str]
@@ -146,11 +121,13 @@ class AIService:
         subject: str,
         difficulty: str = "medium",
         count: int = 5,
-        language: str = "en",
+        language: str = "uz",
     ) -> list[dict[str, Any]]:
         """Generate multiple choice questions in structured JSON format."""
+        from app.services.quiz.quiz_bank import generate_curated_quiz
+
         if not self.is_configured:
-            return self._generate_fallback_quiz(subject, difficulty, count)
+            return generate_curated_quiz(subject, difficulty, count, language)
 
         prompt = QUIZ_GENERATION_PROMPT.format(
             subject=subject,
@@ -175,12 +152,10 @@ class AIService:
             data = json.loads(cleaned)
             if isinstance(data, list) and len(data) > 0:
                 return data
-            return self._generate_fallback_quiz(subject, difficulty, count)
+            return generate_curated_quiz(subject, difficulty, count, language)
         except Exception as e:
             logger.error(f"AI quiz generation failed: {e}")
-            if "insufficient_quota" in str(e) or "credit_balance_exhausted" in str(e):
-                return self._generate_fallback_quiz(subject, difficulty, count)
-            raise
+            return generate_curated_quiz(subject, difficulty, count, language)
 
     async def generate_study_plan(
         self,

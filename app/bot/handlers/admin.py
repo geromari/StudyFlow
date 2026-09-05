@@ -92,10 +92,14 @@ async def handle_admin_broadcast_send(
 
 
 @router.callback_query(F.data == "admin_ban")
-async def handle_admin_ban_prompt(callback: CallbackQuery, state: FSMContext) -> None:
+async def handle_admin_ban_prompt(
+    callback: CallbackQuery,
+    state: FSMContext,
+    lang: str = DEFAULT_LANGUAGE,
+) -> None:
     await state.set_state(AdminState.waiting_for_ban_user_id)
     await callback.answer()
-    await callback.message.answer("Enter Telegram ID to ban:")
+    await callback.message.answer(t("admin_ban_prompt", lang))
 
 
 @router.message(AdminState.waiting_for_ban_user_id)
@@ -107,7 +111,7 @@ async def handle_admin_ban_execute(
 ) -> None:
     val = (message.text or "").strip()
     if not val.isdigit():
-        await message.answer("⚠️ Please enter a numeric Telegram ID.")
+        await message.answer(t("admin_enter_numeric_id", lang))
         return
 
     target_id = int(val)
@@ -116,16 +120,20 @@ async def handle_admin_ban_execute(
     await state.clear()
 
     if success:
-        await message.answer(f"🚫 User `{target_id}` has been suspended.", reply_markup=get_main_menu_keyboard(lang))
+        await message.answer(t("admin_user_banned", lang, target_id=target_id), reply_markup=get_main_menu_keyboard(lang))
     else:
-        await message.answer(f"⚠️ User `{target_id}` not found.", reply_markup=get_main_menu_keyboard(lang))
+        await message.answer(t("admin_user_not_found", lang, target_id=target_id), reply_markup=get_main_menu_keyboard(lang))
 
 
 @router.callback_query(F.data == "admin_unban")
-async def handle_admin_unban_prompt(callback: CallbackQuery, state: FSMContext) -> None:
+async def handle_admin_unban_prompt(
+    callback: CallbackQuery,
+    state: FSMContext,
+    lang: str = DEFAULT_LANGUAGE,
+) -> None:
     await state.set_state(AdminState.waiting_for_unban_user_id)
     await callback.answer()
-    await callback.message.answer("Enter Telegram ID to unban:")
+    await callback.message.answer(t("admin_unban_prompt", lang))
 
 
 @router.message(AdminState.waiting_for_unban_user_id)
@@ -137,7 +145,7 @@ async def handle_admin_unban_execute(
 ) -> None:
     val = (message.text or "").strip()
     if not val.isdigit():
-        await message.answer("⚠️ Please enter a numeric Telegram ID.")
+        await message.answer(t("admin_enter_numeric_id", lang))
         return
 
     target_id = int(val)
@@ -146,6 +154,6 @@ async def handle_admin_unban_execute(
     await state.clear()
 
     if success:
-        await message.answer(f"✅ User `{target_id}` has been unbanned.", reply_markup=get_main_menu_keyboard(lang))
+        await message.answer(t("admin_user_unbanned", lang, target_id=target_id), reply_markup=get_main_menu_keyboard(lang))
     else:
-        await message.answer(f"⚠️ User `{target_id}` not found.", reply_markup=get_main_menu_keyboard(lang))
+        await message.answer(t("admin_user_not_found", lang, target_id=target_id), reply_markup=get_main_menu_keyboard(lang))

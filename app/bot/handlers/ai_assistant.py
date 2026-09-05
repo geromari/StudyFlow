@@ -19,20 +19,20 @@ logger = logging.getLogger(__name__)
 router = Router(name="ai_assistant_router")
 
 
-def get_ai_quick_actions_keyboard() -> InlineKeyboardMarkup:
+def get_ai_quick_actions_keyboard(lang: str = DEFAULT_LANGUAGE) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="💡 Explain", callback_data="ai_mode_explain"),
-                InlineKeyboardButton(text="📝 Summarize", callback_data="ai_mode_summarize"),
+                InlineKeyboardButton(text=t("ai_mode_explain_btn", lang), callback_data="ai_mode_explain"),
+                InlineKeyboardButton(text=t("ai_mode_summarize_btn", lang), callback_data="ai_mode_summarize"),
             ],
             [
-                InlineKeyboardButton(text="🔍 Examples", callback_data="ai_mode_examples"),
-                InlineKeyboardButton(text="📑 Study Notes", callback_data="ai_mode_study_notes"),
+                InlineKeyboardButton(text=t("ai_mode_examples_btn", lang), callback_data="ai_mode_examples"),
+                InlineKeyboardButton(text=t("ai_mode_study_notes_btn", lang), callback_data="ai_mode_study_notes"),
             ],
             [
-                InlineKeyboardButton(text="🔢 Step-by-Step", callback_data="ai_mode_step_by_step"),
-                InlineKeyboardButton(text="🧹 Clear History", callback_data="ai_clear_history"),
+                InlineKeyboardButton(text=t("ai_mode_step_by_step_btn", lang), callback_data="ai_mode_step_by_step"),
+                InlineKeyboardButton(text=t("ai_clear_history_btn", lang), callback_data="ai_clear_history"),
             ],
         ]
     )
@@ -46,7 +46,7 @@ async def handle_ai_menu(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     if not user:
-        await message.answer("Please /start the bot first.")
+        await message.answer(t("please_start_first", lang))
         return
 
     await state.set_state(AIAssistantState.waiting_for_prompt)
@@ -54,20 +54,26 @@ async def handle_ai_menu(
 
     await message.answer(
         t("ai_assistant_intro", lang),
-        reply_markup=get_ai_quick_actions_keyboard(),
+        reply_markup=get_ai_quick_actions_keyboard(lang),
     )
     await message.answer(
-        "Type your question or study topic below:",
+        t("ai_prompt_enter", lang),
         reply_markup=get_cancel_keyboard(lang),
     )
 
 
 @router.callback_query(AIAssistantState.waiting_for_prompt, F.data.startswith("ai_mode_"))
-async def handle_ai_mode_select(callback: CallbackQuery, state: FSMContext) -> None:
+async def handle_ai_mode_select(
+    callback: CallbackQuery,
+    state: FSMContext,
+    lang: str = DEFAULT_LANGUAGE,
+) -> None:
     mode = callback.data.replace("ai_mode_", "")
     await state.update_data(ai_mode=mode)
-    await callback.answer(f"Mode set: {mode.replace('_', ' ').capitalize()}")
-    await callback.message.answer(f"Mode **{mode.replace('_', ' ').capitalize()}** active. Enter your topic:")
+    btn_text = t(f"ai_mode_{mode}_btn", lang)
+    msg = t("ai_mode_activated", lang, mode=btn_text)
+    await callback.answer(msg[:50])
+    await callback.message.answer(msg)
 
 
 @router.callback_query(F.data == "ai_clear_history")
@@ -123,6 +129,7 @@ async def handle_ai_query(
             conversation_history=history,
             user_prompt=prompt,
             mode=mode,
+            language=lang,
         )
 
         # 4. Save to conversation history

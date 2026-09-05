@@ -27,7 +27,7 @@ async def handle_settings_menu(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     if not user or not user.settings:
-        await message.answer("Please /start the bot first.")
+        await message.answer(t("please_start_first", lang))
         return
 
     rem_status = "Enabled" if user.settings.reminders_enabled else "Disabled"
@@ -48,9 +48,9 @@ async def handle_settings_menu(
 
 
 @router.callback_query(F.data == "set_lang")
-async def handle_settings_change_language(callback: CallbackQuery) -> None:
+async def handle_settings_change_language(callback: CallbackQuery, lang: str = DEFAULT_LANGUAGE) -> None:
     await callback.message.edit_text(
-        "Choose language / Tilni tanlang / Выберите язык:",
+        t("choose_lang_title", lang),
         reply_markup=get_language_keyboard(),
     )
 
@@ -67,7 +67,7 @@ async def handle_settings_save_language(
     user_repo = UserRepository(session)
     await user_repo.update_settings(user.id, language=chosen_lang)
 
-    await callback.answer(f"Language updated to {chosen_lang.upper()}!")
+    await callback.answer(t("lang_updated", chosen_lang, lang=chosen_lang.upper()))
     await callback.message.answer(
         t("main_menu_title", chosen_lang),
         reply_markup=get_main_menu_keyboard(chosen_lang),
@@ -78,10 +78,11 @@ async def handle_settings_save_language(
 async def handle_settings_change_target_prompt(
     callback: CallbackQuery,
     state: FSMContext,
+    lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     await state.set_state(SettingsState.changing_target)
     await callback.message.edit_text(
-        "Select your new daily study target:",
+        t("settings_select_target", lang),
         reply_markup=get_target_presets_keyboard(),
     )
 
@@ -101,7 +102,7 @@ async def handle_settings_save_target(
     await user_repo.update_settings(user.id, daily_target=target)
     await state.clear()
 
-    await callback.answer(f"Daily target updated to {target} minutes!", show_alert=True)
+    await callback.answer(t("target_updated", lang, target=target), show_alert=True)
     await callback.message.answer(
         t("main_menu_title", lang),
         reply_markup=get_main_menu_keyboard(lang),
@@ -130,8 +131,8 @@ async def handle_settings_toggle_reminders(
         is_enabled=new_status,
     )
 
-    status_str = "enabled" if new_status else "disabled"
-    await callback.answer(f"Reminders {status_str}!")
+    alert_text = t("reminders_enabled_alert", lang) if new_status else t("reminders_disabled_alert", lang)
+    await callback.answer(alert_text)
     await callback.message.edit_reply_markup(
         reply_markup=get_settings_keyboard(new_status, lang)
     )
@@ -146,7 +147,7 @@ async def handle_settings_change_time_prompt(
     await state.set_state(SettingsState.changing_reminder_time)
     await callback.answer()
     await callback.message.answer(
-        "Enter new daily reminder time in HH:MM format (UTC):\n(e.g., 18:00 or 09:30)",
+        t("settings_change_rem_prompt", lang),
         reply_markup=get_cancel_keyboard(lang),
     )
 
@@ -165,12 +166,12 @@ async def handle_settings_save_time(
     # Simple validation HH:MM
     parts = time_val.split(":")
     if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
-        await message.answer("⚠️ Please enter a valid time in HH:MM format (e.g., 18:00):")
+        await message.answer(t("time_invalid_format", lang))
         return
 
     hours, mins = int(parts[0]), int(parts[1])
     if not (0 <= hours <= 23 and 0 <= mins <= 59):
-        await message.answer("⚠️ Hours must be 0-23 and minutes 0-59. Try again:")
+        await message.answer(t("time_invalid_range", lang))
         return
 
     formatted_time = f"{hours:02d}:{mins:02d}"
@@ -187,6 +188,6 @@ async def handle_settings_save_time(
 
     await state.clear()
     await message.answer(
-        f"✅ Daily study reminder time set to {formatted_time} UTC!",
+        t("rem_time_saved", lang, time=formatted_time),
         reply_markup=get_main_menu_keyboard(lang),
     )

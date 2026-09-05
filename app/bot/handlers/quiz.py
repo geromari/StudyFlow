@@ -1,5 +1,6 @@
 """Quiz generator and interactive quiz flow handlers."""
 
+import html
 import json
 import logging
 
@@ -36,7 +37,7 @@ async def handle_quiz_menu(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     if not user:
-        await message.answer("Please /start the bot first.")
+        await message.answer(t("please_start_first", lang))
         return
 
     subject_repo = SubjectRepository(session)
@@ -148,7 +149,7 @@ async def send_quiz_question(
     quiz_id: int,
     question_index: int,
     session: AsyncSession,
-    lang: str = "en",
+    lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     quiz_repo = QuizRepository(session)
     quiz = await quiz_repo.get_quiz_with_questions(quiz_id)
@@ -158,15 +159,25 @@ async def send_quiz_question(
     question = quiz.questions[question_index]
     options_dict = json.loads(question.options)
 
+    q_header = t("quiz_question_header", lang)
+    opts_header = t("quiz_options_title", lang)
+    pick_prompt = t("quiz_select_answer", lang)
+
     text = (
-        f"📝 **Question {question_index + 1}/{len(quiz.questions)}**:\n\n"
-        f"{question.question_text}"
+        f"📝 <b>{q_header} {question_index + 1}/{len(quiz.questions)}</b>:\n\n"
+        f"<b>{html.escape(question.question_text)}</b>\n\n"
+        f"📌 <i>{opts_header}</i>\n"
+        f"🇦 <b>A)</b> {html.escape(str(options_dict.get('A', '')))}\n"
+        f"🇧 <b>B)</b> {html.escape(str(options_dict.get('B', '')))}\n"
+        f"🇨 <b>C)</b> {html.escape(str(options_dict.get('C', '')))}\n"
+        f"🇩 <b>D)</b> {html.escape(str(options_dict.get('D', '')))}\n\n"
+        f"👇 <i>{pick_prompt}</i>"
     )
 
     await message.edit_text(
         text,
         reply_markup=get_quiz_options_keyboard(options_dict, question_index, len(quiz.questions)),
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
 
 
@@ -211,14 +222,14 @@ async def handle_quiz_answer(
         result_text = t(
             "quiz_correct",
             lang,
-            explanation=question.explanation or "Well done!",
+            explanation=question.explanation or ("Ajoyib!" if lang == "uz" else "Well done!"),
         )
     else:
         result_text = t(
             "quiz_wrong",
             lang,
             correct=question.correct_option,
-            explanation=question.explanation or "Review this topic to master the concept.",
+            explanation=question.explanation or ("Ushbu mavzuni mustahkamlang." if lang == "uz" else "Review this topic."),
         )
 
     next_index = current_index + 1
@@ -226,7 +237,7 @@ async def handle_quiz_answer(
         # Show feedback with button to advance to next question
         await callback.message.edit_text(
             result_text,
-            reply_markup=get_quiz_next_keyboard(next_index, total_questions),
+            reply_markup=get_quiz_next_keyboard(next_index, total_questions, lang),
             parse_mode="Markdown",
         )
     else:
@@ -252,11 +263,17 @@ async def handle_quiz_answer(
         )
 
         for ach in unlocked:
-            final_msg += f"\n\n🏆 **Achievement Unlocked**: {ach.icon} {ach.title} (+{ach.xp_reward} XP)!"
+            final_msg += "\n\n" + t(
+                "achievement_unlocked_notification",
+                lang,
+                icon=ach.icon,
+                title=ach.title,
+                xp=ach.xp_reward,
+            )
 
         await callback.message.edit_text(final_msg, parse_mode="Markdown")
         await callback.message.answer(
-            "🎓 Keep up the great work!",
+            t("quiz_keep_it_up", lang),
             reply_markup=get_main_menu_keyboard(lang),
         )
         await state.clear()

@@ -20,7 +20,7 @@ async def handle_achievements_menu(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     if not user:
-        await message.answer("Please /start the bot first.")
+        await message.answer(t("please_start_first", lang))
         return
 
     ach_repo = AchievementRepository(session)
@@ -32,7 +32,7 @@ async def handle_achievements_menu(
     lines = []
     for ach, unlocked in achievements:
         if unlocked:
-            lines.append(f"{ach.icon} **{ach.title}** (Unlocked)\n_{ach.description}_ (+{ach.xp_reward} XP)")
+            lines.append(f"{ach.icon} **{ach.title}**\n_{ach.description}_ (+{ach.xp_reward} XP)")
         else:
             lines.append(f"🔒 **{ach.title}**\n_{ach.description}_ (+{ach.xp_reward} XP)")
 
@@ -47,7 +47,7 @@ async def handle_achievements_menu(
 
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🏆 View Leaderboard", callback_data="view_leaderboard")]
+            [InlineKeyboardButton(text=t("btn_leaderboard", lang), callback_data="view_leaderboard")]
         ]
     )
 
@@ -75,7 +75,7 @@ async def handle_leaderboard_view(
         display_name = u.first_name[:15]
         ranking_lines.append(f"{medal} {display_name} — **{u.xp} XP** (Level {u.level})")
 
-    ranking_str = "\n".join(ranking_lines) if ranking_lines else "No rankings yet."
+    ranking_str = "\n".join(ranking_lines) if ranking_lines else t("leaderboard_empty", lang)
     text = t(
         "leaderboard_title",
         lang,

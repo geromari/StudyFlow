@@ -28,7 +28,7 @@ async def handle_goals_menu(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     if not user:
-        await message.answer("Please /start the bot first.")
+        await message.answer(t("please_start_first", lang))
         return
 
     goal_repo = GoalRepository(session)
@@ -137,13 +137,22 @@ async def handle_view_goal(
     if not goal:
         return
 
-    status = "✅ Completed" if goal.is_completed else f"⏳ In Progress ({goal.progress_percent}%)"
-    deadline_str = goal.target_date.strftime("%Y-%m-%d") if goal.target_date else "No deadline"
+    if lang == "uz":
+        status = "✅ Bajarildi" if goal.is_completed else f"⏳ Jarayonda ({goal.progress_percent}%)"
+        status_lbl, dline_lbl, no_dline, goal_lbl = "Holat", "Muddat", "Muddatsiz", "Maqsad"
+    elif lang == "ru":
+        status = "✅ Выполнено" if goal.is_completed else f"⏳ В процессе ({goal.progress_percent}%)"
+        status_lbl, dline_lbl, no_dline, goal_lbl = "Статус", "Срок", "Без срока", "Цель"
+    else:
+        status = "✅ Completed" if goal.is_completed else f"⏳ In Progress ({goal.progress_percent}%)"
+        status_lbl, dline_lbl, no_dline, goal_lbl = "Status", "Deadline", "No deadline", "Goal"
+
+    deadline_str = goal.target_date.strftime("%Y-%m-%d") if goal.target_date else no_dline
 
     text = (
-        f"🎯 **Goal: {goal.title}**\n\n"
-        f"Status: {status}\n"
-        f"Deadline: {deadline_str}"
+        f"🎯 **{goal_lbl}: {goal.title}**\n\n"
+        f"{status_lbl}: {status}\n"
+        f"{dline_lbl}: {deadline_str}"
     )
     await callback.message.edit_text(
         text,
@@ -178,19 +187,28 @@ async def handle_increment_goal_progress(
         user_repo = UserRepository(session)
         await user_repo.add_xp(user.id, XP_GOAL_COMPLETED)
         unlocked = await ach_service.unlock_goal_achievement(user.id)
-        msg = f"🎉 Goal completed! +{XP_GOAL_COMPLETED} XP"
+        msg = f"🎉 Goal completed! +{XP_GOAL_COMPLETED} XP" if lang == "en" else f"🎉 Maqsad bajarildi! +{XP_GOAL_COMPLETED} XP"
         if unlocked:
             msg += f"\n🏆 Unlocked: {unlocked.icon} {unlocked.title}!"
         await callback.answer(msg, show_alert=True)
     else:
-        await callback.answer(f"Progress updated to {new_prog}%")
+        await callback.answer(f"{new_prog}%")
 
     goal = await goal_repo.get_by_id(goal_id)
     if goal:
-        status = "✅ Completed" if goal.is_completed else f"⏳ In Progress ({goal.progress_percent}%)"
-        deadline_str = goal.target_date.strftime("%Y-%m-%d") if goal.target_date else "No deadline"
+        if lang == "uz":
+            status = "✅ Bajarildi" if goal.is_completed else f"⏳ Jarayonda ({goal.progress_percent}%)"
+            status_lbl, dline_lbl, no_dline, goal_lbl = "Holat", "Muddat", "Muddatsiz", "Maqsad"
+        elif lang == "ru":
+            status = "✅ Выполнено" if goal.is_completed else f"⏳ В процессе ({goal.progress_percent}%)"
+            status_lbl, dline_lbl, no_dline, goal_lbl = "Статус", "Срок", "Без срока", "Цель"
+        else:
+            status = "✅ Completed" if goal.is_completed else f"⏳ In Progress ({goal.progress_percent}%)"
+            status_lbl, dline_lbl, no_dline, goal_lbl = "Status", "Deadline", "No deadline", "Goal"
+
+        deadline_str = goal.target_date.strftime("%Y-%m-%d") if goal.target_date else no_dline
         await callback.message.edit_text(
-            f"🎯 **Goal: {goal.title}**\n\nStatus: {status}\nDeadline: {deadline_str}",
+            f"🎯 **{goal_lbl}: {goal.title}**\n\n{status_lbl}: {status}\n{dline_lbl}: {deadline_str}",
             reply_markup=get_goal_actions_keyboard(goal_id, goal.is_completed, lang),
             parse_mode="Markdown",
         )
@@ -244,7 +262,8 @@ async def handle_delete_goal(
         await goal_repo.delete(goal)
 
     goals = await goal_repo.get_user_goals(user.id)
-    await callback.answer("Goal deleted.")
+    del_msg = "Maqsad o'chirildi." if lang == "uz" else ("Цель удалена." if lang == "ru" else "Goal deleted.")
+    await callback.answer(del_msg)
     await callback.message.edit_text(
         t("goals_title", lang, count=len(goals)),
         reply_markup=get_goals_keyboard(goals, lang),

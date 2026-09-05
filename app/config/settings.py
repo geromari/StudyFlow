@@ -38,9 +38,9 @@ class Settings(BaseSettings):
 
     # App options
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
-    default_language: str = Field(default="en", alias="DEFAULT_LANGUAGE")
+    default_language: str = Field(default="uz", alias="DEFAULT_LANGUAGE")
     default_timezone: str = Field(default="UTC", alias="DEFAULT_TIMEZONE")
-    max_pdf_size_mb: int = Field(default=10, alias="MAX_PDF_SIZE_MB")
+    max_pdf_size_mb: int = Field(default=200, alias="MAX_PDF_SIZE_MB")
 
     @field_validator("admin_ids", mode="before")
     @classmethod

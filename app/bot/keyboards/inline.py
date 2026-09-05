@@ -100,6 +100,28 @@ def get_topics_keyboard(subject_id: int, topics: list[Topic], lang: str = "en") 
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
+def get_subject_study_menu_keyboard(subject_id: int, lang: str = "uz") -> InlineKeyboardMarkup:
+    """Study options menu when clicking 'O'rganishni boshlash'."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=t("btn_study_focus_15", lang), callback_data=f"focus_start_15_{subject_id}"),
+                InlineKeyboardButton(text=t("btn_study_focus_25", lang), callback_data=f"focus_start_25_{subject_id}"),
+            ],
+            [
+                InlineKeyboardButton(text=t("btn_study_focus_45", lang), callback_data=f"focus_start_45_{subject_id}"),
+                InlineKeyboardButton(text=t("btn_study_quiz", lang), callback_data=f"quiz_subj_{subject_id}"),
+            ],
+            [
+                InlineKeyboardButton(text=t("btn_study_ai_explain", lang), callback_data=f"ai_subj_{subject_id}"),
+            ],
+            [
+                InlineKeyboardButton(text=t("btn_back", lang), callback_data=f"subj_view_{subject_id}"),
+            ],
+        ]
+    )
+
+
 def get_quiz_subject_select_keyboard(subjects: list[Subject], lang: str = "en") -> InlineKeyboardMarkup:
     """Select subject for quiz."""
     keyboard = []
@@ -108,7 +130,7 @@ def get_quiz_subject_select_keyboard(subjects: list[Subject], lang: str = "en") 
             InlineKeyboardButton(text=f"{subj.color_icon} {subj.name}", callback_data=f"quiz_subj_{subj.id}")
         ])
     keyboard.append([
-        InlineKeyboardButton(text="🌐 General Knowledge", callback_data="quiz_subj_0")
+        InlineKeyboardButton(text=t("quiz_general_knowledge", lang), callback_data="quiz_subj_0")
     ])
     keyboard.append([
         InlineKeyboardButton(text=t("btn_cancel", lang), callback_data="quiz_cancel")
@@ -149,22 +171,25 @@ def get_quiz_count_keyboard(lang: str = "en") -> InlineKeyboardMarkup:
 
 
 def get_quiz_options_keyboard(options: dict[str, str], current_index: int, total: int) -> InlineKeyboardMarkup:
-    """Render options A, B, C, D as buttons."""
-    keyboard = []
-    for key, text in options.items():
-        keyboard.append([
-            InlineKeyboardButton(
-                text=f"{key}) {text}",
-                callback_data=f"quiz_ans_{key}_{current_index}",
-            )
-        ])
-    return InlineKeyboardMarkup(inline_keyboard=keyboard)
-
-
-def get_quiz_next_keyboard(next_index: int, total: int) -> InlineKeyboardMarkup:
+    """Render compact, clearly visible options buttons A, B, C, D."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=f"Next Question ({next_index + 1}/{total}) ➡️", callback_data=f"quiz_next_{next_index}")]
+            [
+                InlineKeyboardButton(text="🅰️ A", callback_data=f"quiz_ans_A_{current_index}"),
+                InlineKeyboardButton(text="🅱️ B", callback_data=f"quiz_ans_B_{current_index}"),
+            ],
+            [
+                InlineKeyboardButton(text="🅲 C", callback_data=f"quiz_ans_C_{current_index}"),
+                InlineKeyboardButton(text="🅳 D", callback_data=f"quiz_ans_D_{current_index}"),
+            ],
+        ]
+    )
+
+
+def get_quiz_next_keyboard(next_index: int, total: int, lang: str = "uz") -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=t("btn_quiz_next", lang, next=next_index + 1, total=total), callback_data=f"quiz_next_{next_index}")]
         ]
     )
 
@@ -257,8 +282,8 @@ def get_pdf_menu_keyboard(doc_id: int, lang: str = "en") -> InlineKeyboardMarkup
     )
 
 
-def get_settings_keyboard(reminders_enabled: bool, lang: str = "en") -> InlineKeyboardMarkup:
-    rem_text = "🔕 Disable Reminders" if reminders_enabled else "🔔 Enable Reminders"
+def get_settings_keyboard(reminders_enabled: bool, lang: str = "uz") -> InlineKeyboardMarkup:
+    rem_text = t("btn_disable_reminders", lang) if reminders_enabled else t("btn_enable_reminders", lang)
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -267,22 +292,22 @@ def get_settings_keyboard(reminders_enabled: bool, lang: str = "en") -> InlineKe
             ],
             [
                 InlineKeyboardButton(text=rem_text, callback_data="set_toggle_rem"),
-                InlineKeyboardButton(text="⏰ Change Time", callback_data="set_rem_time"),
+                InlineKeyboardButton(text=t("btn_change_rem_time", lang), callback_data="set_rem_time"),
             ],
         ]
     )
 
 
-def get_admin_keyboard(lang: str = "en") -> InlineKeyboardMarkup:
+def get_admin_keyboard(lang: str = "uz") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="📊 Statistics", callback_data="admin_stats"),
-                InlineKeyboardButton(text="📢 Broadcast", callback_data="admin_broadcast"),
+                InlineKeyboardButton(text=t("btn_admin_stats", lang), callback_data="admin_stats"),
+                InlineKeyboardButton(text=t("btn_admin_broadcast", lang), callback_data="admin_broadcast"),
             ],
             [
-                InlineKeyboardButton(text="🚫 Ban User", callback_data="admin_ban"),
-                InlineKeyboardButton(text="✅ Unban User", callback_data="admin_unban"),
+                InlineKeyboardButton(text=t("btn_admin_ban", lang), callback_data="admin_ban"),
+                InlineKeyboardButton(text=t("btn_admin_unban", lang), callback_data="admin_unban"),
             ],
         ]
     )

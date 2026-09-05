@@ -19,7 +19,7 @@ async def handle_progress_menu(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     if not user:
-        await message.answer("Please /start the bot first.")
+        await message.answer(t("please_start_first", lang))
         return
 
     progress_service = ProgressService(session)

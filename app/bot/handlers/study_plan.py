@@ -28,7 +28,7 @@ async def handle_study_plan_menu(
     lang: str = DEFAULT_LANGUAGE,
 ) -> None:
     if not user:
-        await message.answer("Please /start the bot first.")
+        await message.answer(t("please_start_first", lang))
         return
 
     task_repo = StudyTaskRepository(session)
@@ -42,7 +42,7 @@ async def handle_study_plan_menu(
         return
 
     await message.answer(
-        t("plan_intro", lang, tasks=f"{len(tasks)} tasks scheduled for today"),
+        t("plan_intro", lang, tasks=f"{len(tasks)}"),
         reply_markup=get_study_plan_keyboard(tasks, lang),
     )
 
@@ -56,7 +56,7 @@ async def handle_plan_generate_prompt(
     await state.set_state(StudyPlanState.waiting_for_goal)
     await callback.answer()
     await callback.message.answer(
-        "What is your study goal for today?\n(e.g., 'Prepare for English midterm', 'Understand dynamic programming'):",
+        t("plan_goal_prompt", lang),
         reply_markup=get_cancel_keyboard(lang),
     )
 
@@ -76,7 +76,7 @@ async def handle_plan_goal_entered(
         return
 
     target_minutes = user.settings.daily_study_target if user.settings else 45
-    wait_msg = await message.answer("⚡ Generating your personalized daily study schedule with AI...")
+    wait_msg = await message.answer(t("plan_generating", lang))
 
     plan_service = StudyPlanService(session)
     try:
@@ -90,10 +90,10 @@ async def handle_plan_goal_entered(
         await state.clear()
 
         await message.answer(
-            t("plan_intro", lang, tasks=f"Generated {len(tasks)} tasks:"),
+            t("plan_intro", lang, tasks=f"{len(tasks)}"),
             reply_markup=get_study_plan_keyboard(tasks, lang),
         )
-        await message.answer("🎓 Here is your schedule! Tap each task when done.", reply_markup=get_main_menu_keyboard(lang))
+        await message.answer(t("plan_schedule_intro", lang), reply_markup=get_main_menu_keyboard(lang))
     except Exception as e:
         logger.error(f"Error generating study plan: {e}")
         try:
@@ -127,10 +127,10 @@ async def handle_task_toggle(
     if is_completed:
         notice = t("task_completed", lang, xp=xp_awarded)
         for ach in unlocked:
-            notice += f"\n🏆 Unlocked: {ach.icon} {ach.title} (+{ach.xp_reward} XP)!"
+            notice += f"\n🏆 {ach.icon} {ach.title} (+{ach.xp_reward} XP)!"
         await callback.answer(notice, show_alert=True)
     else:
-        await callback.answer("Task marked as pending.")
+        await callback.answer(t("plan_task_pending", lang))
 
 
 @router.callback_query(F.data == "task_add")
@@ -142,7 +142,7 @@ async def handle_manual_task_prompt(
     await state.set_state(StudyPlanState.waiting_for_manual_task)
     await callback.answer()
     await callback.message.answer(
-        "Enter task title:\n(e.g., 'Solve 10 algebra problems - 30 min')",
+        t("plan_task_add_prompt", lang),
         reply_markup=get_cancel_keyboard(lang),
     )
 
@@ -171,8 +171,8 @@ async def handle_save_manual_task(
     await state.clear()
 
     tasks = await task_repo.get_tasks_for_date(user.id, date.today())
-    await message.answer("✅ Task added to today's plan!", reply_markup=get_main_menu_keyboard(lang))
+    await message.answer(t("plan_task_added", lang), reply_markup=get_main_menu_keyboard(lang))
     await message.answer(
-        t("plan_intro", lang, tasks=f"{len(tasks)} tasks:"),
+        t("plan_intro", lang, tasks=f"{len(tasks)}"),
         reply_markup=get_study_plan_keyboard(tasks, lang),
     )
