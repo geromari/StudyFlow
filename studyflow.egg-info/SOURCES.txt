@@ -1,0 +1,6 @@
+pyproject.toml
+studyflow.egg-info/PKG-INFO
+studyflow.egg-info/SOURCES.txt
+studyflow.egg-info/dependency_links.txt
+studyflow.egg-info/requires.txt
+studyflow.egg-info/top_level.txt
