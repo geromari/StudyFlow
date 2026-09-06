@@ -4,3 +4,10 @@ ddgs
 alembic
 pydantic
 python-dotenv
+python-telegram-bot
+asyncpg
+ddgs
+alembic
+pydantic
+python-dotenv
+duckduckgo_search
