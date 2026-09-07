@@ -35,11 +35,18 @@ class QuizService:
         language: str = "en",
     ) -> Quiz:
         """Generate questions via AI and save to database."""
+        recent_questions = await self.quiz_repo.get_recent_user_questions(
+            user_id=user_id,
+            subject_id=subject_id,
+            limit=25,
+        )
+
         raw_questions = await self.ai.generate_quiz(
             subject=subject_name,
             difficulty=difficulty,
             count=count,
             language=language,
+            exclude_questions=recent_questions,
         )
 
         # Validate and clean questions

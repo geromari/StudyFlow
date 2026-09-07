@@ -2,13 +2,16 @@
 
 import json
 import logging
+import random
 import re
+import uuid
 from typing import Any
 
 from openai import AsyncOpenAI
 
 from app.config.settings import settings
 from app.services.ai.prompt_templates import (
+    DIFFICULTY_GUIDELINES,
     DOCUMENT_QA_PROMPT,
     DOCUMENT_SUMMARY_PROMPT,
     MODE_PROMPTS,
@@ -122,18 +125,44 @@ class AIService:
         difficulty: str = "medium",
         count: int = 5,
         language: str = "uz",
+        exclude_questions: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Generate multiple choice questions in structured JSON format."""
+        """Generate multiple choice questions in structured JSON format with distinct difficulties and variety."""
         from app.services.quiz.quiz_bank import generate_curated_quiz
 
+        norm_diff = (difficulty or "medium").lower().strip()
+        if norm_diff not in ("easy", "medium", "hard"):
+            norm_diff = "medium"
+
         if not self.is_configured:
-            return generate_curated_quiz(subject, difficulty, count, language)
+            return generate_curated_quiz(
+                subject=subject,
+                difficulty=norm_diff,
+                count=count,
+                language=language,
+                exclude_questions=exclude_questions,
+            )
+
+        diff_guideline = DIFFICULTY_GUIDELINES.get(
+            norm_diff, DIFFICULTY_GUIDELINES["medium"]
+        )
+        variation_seed = f"{uuid.uuid4().hex[:8]}_{random.randint(1000, 9999)}"
+
+        if exclude_questions:
+            exclude_instruction = (
+                "CRITICAL: Do NOT generate or repeat any of these previously asked questions:\n"
+                + "\n".join(f"- {q.strip()[:120]}" for q in exclude_questions[:15] if q.strip())
+            )
+        else:
+            exclude_instruction = "Ensure all questions in this session are fresh, varied, and unique."
 
         prompt = QUIZ_GENERATION_PROMPT.format(
             subject=subject,
-            difficulty=difficulty,
+            difficulty_guideline=diff_guideline,
             count=count,
             language=language,
+            variation_seed=variation_seed,
+            exclude_instruction=exclude_instruction,
         )
 
         try:
@@ -141,21 +170,63 @@ class AIService:
             response = await self._client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a professional quiz generator. Respond only in JSON."},
+                    {
+                        "role": "system",
+                        "content": "You are a professional academic quiz generator. Respond only in valid JSON.",
+                    },
                     {"role": "user", "content": prompt},
                 ],
                 max_tokens=self.max_output_tokens * 2,
-                temperature=0.6,
+                temperature=0.85,
             )
             raw = response.choices[0].message.content or "[]"
             cleaned = clean_json_response(raw)
             data = json.loads(cleaned)
             if isinstance(data, list) and len(data) > 0:
-                return data
-            return generate_curated_quiz(subject, difficulty, count, language)
+                unique_data: list[dict[str, Any]] = []
+                seen_questions: set[str] = set()
+                exclude_lower = {q.strip().lower() for q in (exclude_questions or [])}
+
+                for item in data:
+                    if not isinstance(item, dict) or "question" not in item:
+                        continue
+                    q_text = str(item["question"]).strip()
+                    q_lower = q_text.lower()
+                    if q_lower in seen_questions or q_lower in exclude_lower:
+                        continue
+                    seen_questions.add(q_lower)
+                    unique_data.append(item)
+
+                if len(unique_data) >= count:
+                    return unique_data[:count]
+
+                if unique_data:
+                    remaining = count - len(unique_data)
+                    supplement = generate_curated_quiz(
+                        subject=subject,
+                        difficulty=norm_diff,
+                        count=remaining,
+                        language=language,
+                        exclude_questions=list(seen_questions | exclude_lower),
+                    )
+                    return unique_data + supplement
+
+            return generate_curated_quiz(
+                subject=subject,
+                difficulty=norm_diff,
+                count=count,
+                language=language,
+                exclude_questions=exclude_questions,
+            )
         except Exception as e:
             logger.error(f"AI quiz generation failed: {e}")
-            return generate_curated_quiz(subject, difficulty, count, language)
+            return generate_curated_quiz(
+                subject=subject,
+                difficulty=norm_diff,
+                count=count,
+                language=language,
+                exclude_questions=exclude_questions,
+            )
 
     async def generate_study_plan(
         self,

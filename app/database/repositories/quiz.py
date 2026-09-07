@@ -104,3 +104,21 @@ class QuizRepository(BaseRepository[Quiz]):
         stmt = select(func.count(Quiz.id)).where(Quiz.completed_at.is_not(None))
         result = await self.session.execute(stmt)
         return result.scalar() or 0
+
+    async def get_recent_user_questions(
+        self,
+        user_id: int,
+        subject_id: int | None = None,
+        limit: int = 25,
+    ) -> list[str]:
+        """Fetch recently asked question texts for this user to avoid repeats."""
+        stmt = (
+            select(QuizQuestion.question_text)
+            .join(Quiz, QuizQuestion.quiz_id == Quiz.id)
+            .where(Quiz.user_id == user_id)
+        )
+        if subject_id is not None:
+            stmt = stmt.where(Quiz.subject_id == subject_id)
+        stmt = stmt.order_by(QuizQuestion.id.desc()).limit(limit)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())

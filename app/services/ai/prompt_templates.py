@@ -20,9 +20,37 @@ MODE_PROMPTS = {
     "step_by_step": "Explain how to solve or understand this step-by-step with clear reasoning: ",
 }
 
-QUIZ_GENERATION_PROMPT = """Generate a multiple-choice quiz with {count} questions on the subject '{subject}' with '{difficulty}' difficulty.
+DIFFICULTY_GUIDELINES = {
+    "easy": """DIFFICULTY LEVEL: EASY (Boshlang'ich / Oson / Elementary)
+- Target: Beginners and introductory learners.
+- Content: Core definitions, basic terminology, fundamental facts, and simple single-step recall questions.
+- Distractors: Obviously incorrect alternatives with clear distinction.
+- Strict Constraints: Absolutely NO complicated mathematical calculations, multi-step deductions, or obscure exceptions.""",
+    "medium": """DIFFICULTY LEVEL: MEDIUM (O'rtacha / Intermediate)
+- Target: Standard exam candidates and intermediate learners.
+- Content: Practical application of rules, standard formula calculations, comparing concepts, identifying cause-and-effect relationships, and 2-step logical deductions.
+- Distractors: Realistic common misconceptions and plausible alternatives.
+- Strict Constraints: Avoid overly trivial single-word recall questions and avoid extreme graduate-level edge cases.""",
+    "hard": """DIFFICULTY LEVEL: HARD (Murakkab / Qiyin / Advanced / Olympiad)
+- Target: Advanced learners, olympiad candidates, and deep subject mastery.
+- Content: In-depth theoretical nuances, multi-step problem solving, calculations with multiple variables, rare exceptions to rules, edge cases, and synthesis of different concepts.
+- Distractors: Highly sophisticated, subtle, and tempting plausible alternatives.
+- Strict Constraints: Avoid simple recall or basic definition questions.""",
+}
+
+QUIZ_GENERATION_PROMPT = """You are an expert academic quiz creator and exam designer.
+Generate a multiple-choice quiz with {count} questions on the subject '{subject}'.
 Language of the quiz must be: {language}.
 
+{difficulty_guideline}
+
+STRICT DIVERSITY & VARIATION RULES:
+1. DIVERSITY: Do NOT produce generic, stereotypical, or repetitive questions. Explore varied sub-topics, practical scenarios, calculations, and unique angles within '{subject}'.
+2. UNIQUENESS: Every question in this generated quiz MUST be distinct from each other.
+3. SESSION VARIATION SEED: {variation_seed} (Use this random seed to explore different branches/topics of '{subject}').
+{exclude_instruction}
+
+FORMAT REQUIREMENTS:
 Return ONLY valid JSON matching this exact array structure:
 [
   {{
@@ -34,10 +62,10 @@ Return ONLY valid JSON matching this exact array structure:
       "D": "Fourth option"
     }},
     "correct_option": "A",
-    "explanation": "Brief explanation of why A is correct."
+    "explanation": "Brief explanation of why the correct option is correct."
   }}
 ]
-Do not include any conversational filler, markdown fences, or extra text outside the JSON array.
+Do not include any markdown fences, conversational filler, or extra text outside the JSON array.
 """
 
 STUDY_PLAN_GENERATION_PROMPT = """Create a balanced, realistic daily study plan for a student.

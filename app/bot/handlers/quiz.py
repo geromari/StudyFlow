@@ -162,9 +162,10 @@ async def send_quiz_question(
     q_header = t("quiz_question_header", lang)
     opts_header = t("quiz_options_title", lang)
     pick_prompt = t("quiz_select_answer", lang)
+    diff_text = t(f"diff_{quiz.difficulty}", lang)
 
     text = (
-        f"📝 <b>{q_header} {question_index + 1}/{len(quiz.questions)}</b>:\n\n"
+        f"📝 <b>{q_header} {question_index + 1}/{len(quiz.questions)} ({diff_text})</b>:\n\n"
         f"<b>{html.escape(question.question_text)}</b>\n\n"
         f"📌 <i>{opts_header}</i>\n"
         f"🇦 <b>A)</b> {html.escape(str(options_dict.get('A', '')))}\n"
