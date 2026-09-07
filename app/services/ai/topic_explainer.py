@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 
 logger = logging.getLogger(__name__)
 
